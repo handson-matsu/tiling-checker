@@ -5,7 +5,7 @@ async function test(name,fn){try{await fn();results.push({name,pass:true});}catc
 const base=new URL('../',location.href).href;
 const appHTML=await (await fetch(new URL('index.html',base))).text();
 const hook=`<base href="${base}"><script>window.counterRequests=[];window.downloads=[];window.fetch=(url,options)=>{window.counterRequests.push({url:String(url),options});return Promise.reject(Error('mock offline'));};HTMLAnchorElement.prototype.click=function(){window.downloads.push(this.download);};<\/script>`;
-const html=appHTML.replace('<head>','<head>'+hook).replace(/src\/app\.js[^"]*/, 'src/app.js?labels-tests=1');
+const html=appHTML.replace('<head>','<head>'+hook).replace(/src\/app\.js[^"]*/, 'src/app.js?piece-faces-tests=1');
 const iframe=document.createElement('iframe');
 async function load(){await new Promise(resolve=>{iframe.onload=resolve;iframe.srcdoc=html;if(!iframe.isConnected)document.querySelector('#fixture').append(iframe);});}
 await load();let w=iframe.contentWindow,d=w.document;
@@ -28,7 +28,7 @@ await test('4・6・8ピースを通して手とペア数を保持',()=>{for(con
 await test('手OFFで両表示から消え、ONで戻り、判定は変わらない',()=>{const status=q('#status').textContent;tick('#show-hand');check(d.querySelectorAll('[data-hand]').length===0,'OFF');check(d.querySelectorAll('#preview text, #board [data-tile] text').length===0,'OFFでもピース文字なし');check(q('#status').textContent===status,'一致判定');tick('#show-hand');check(d.querySelectorAll('[data-hand]').length===17,'ON');check(d.querySelectorAll('#preview text').length===0,'手と重なる文字を非表示');});
 const snapshots=[];const originalCreate=w.URL.createObjectURL.bind(w.URL);w.URL.createObjectURL=blob=>{if(blob.type.startsWith('image/svg+xml'))snapshots.push(blob);return originalCreate(blob);};
 async function png(button){q('#export-status').textContent='';click(button);const deadline=Date.now()+8000;while(!q('#export-status').textContent&&Date.now()<deadline)await new Promise(r=>setTimeout(r,20));check(q('#export-status').textContent.includes('保存しました'),'PNG保存失敗');}
-await test('単体とタイリングPNGの元SVGに手を含み、OFFでは含まない',async()=>{if(!q('#back-color').checked)tick('#back-color');await png('#save-tile');check((await snapshots[0].text()).includes('#DCE2E6'),'裏面背景のPNG');click('#flip');await png('#save-board');check((await snapshots[1].text()).includes('fill="#B7D9E8"'),'反転色の保存');check(((await snapshots[0].text()).match(/data-hand=/g)||[]).length===1,'単体SVG');check(((await snapshots[1].text()).match(/data-hand=/g)||[]).length===16,'全体SVG');tick('#show-hand');await png('#save-tile');check(!(await snapshots[2].text()).includes('data-hand='),'OFFの保存');for(const blob of snapshots){const svg=new w.DOMParser().parseFromString(await blob.text(),'image/svg+xml');check(![...svg.querySelectorAll('text')].some(t=>/[A-Z]\s*(表|裏)/.test(t.textContent)),'PNGのピース文字なし');}check(w.downloads.length===3,'PNGダウンロード');});
+await test('単体とタイリングPNGの元SVGに手を含み、OFFでは含まない',async()=>{if(!q('#back-color').checked)tick('#back-color');await png('#save-tile');check((await snapshots[0].text()).includes('#DCE2E6'),'裏面背景のPNG');click('#flip');await png('#save-board');check((await snapshots[1].text()).includes('fill="#B7D9E8"'),'反転色の保存');check(((await snapshots[0].text()).match(/data-hand=/g)||[]).length===1,'単体SVG');check(((await snapshots[1].text()).match(/data-hand=/g)||[]).length===16,'全体SVG');tick('#show-hand');await png('#save-tile');check(!(await snapshots[2].text()).includes('data-hand='),'OFFの保存');for(const blob of snapshots){const source=await blob.text();check(!source.includes('floating-flip'),'PNGに操作ボタンを含めない');const svg=new w.DOMParser().parseFromString(source,'image/svg+xml');check(![...svg.querySelectorAll('text')].some(t=>/[A-Z]\s*(表|裏)/.test(t.textContent)),'PNGのピース文字なし');}check(w.downloads.length===3,'PNGダウンロード');});
 await test('不一致は共通辺ごとに太い実線と白丸×、最前面でクリックを透過',()=>{
  click('#settings-reset');click('#all-reset');check(q('#show-mismatches').checked,'初期ON');click('[data-tile="0"]');click('[data-tile="0"]');
  const layer=q('[data-mismatch-layer]'),warnings=layer.querySelectorAll('[data-mismatch]');check(warnings.length===2,'警告数');check(q('#board svg').lastElementChild===layer,'最前面');
@@ -43,6 +43,29 @@ await test('PNGに警告ON/OFFを反映し、再表示後も集計は同じ',asy
 });
 await test('4・6・8ピースで辺全体の不一致数と警告数が等しい',()=>{
  for(const mode of ['4','6','8']){select('#piece-mode',mode);const bad=Number(q('#status').textContent.match(/(\d+)辺が不一致/)[1]);check(d.querySelectorAll('[data-mismatch]').length===bad,'警告数と判定');}
+});
+await test('近くの反転ボタンは選択時だけ表示し、タッチでも反転のみ実行',()=>{
+ click('#settings-reset');click('#all-reset');check(q('#floating-flip').hidden,'未選択');click('[data-tile="5"]');check(!q('#floating-flip').hidden,'選択時表示');check(q('#floating-flip').offsetHeight>=44,'タッチ領域');
+ const before=q('[data-tile="5"]').getAttribute('transform');
+ q('#floating-flip').dispatchEvent(new w.PointerEvent('pointerdown',{bubbles:true,pointerType:'touch'}));q('#floating-flip').dispatchEvent(new w.PointerEvent('pointerup',{bubbles:true,pointerType:'touch'}));click('#floating-flip');
+ const after=q('[data-tile="5"]').getAttribute('transform');check(after.includes('rotate(0) scale(-1 1)'),'回転なしで反転');check(q('[data-tile="5"]').getAttribute('aria-pressed')==='true','選択維持');click('#flip');check(q('[data-tile="5"]').getAttribute('transform')===before,'従来ボタンと同じ処理');
+ click('[data-tile="6"]');check(q('[data-tile="6"]').getAttribute('transform').includes('rotate(0)'),'別タイルは選択のみ');click('[data-tile="6"]');check(q('[data-tile="6"]').getAttribute('transform').includes('rotate(90)'),'再クリック回転');
+ q('.tiling-panel h2').dispatchEvent(new w.MouseEvent('click',{bubbles:true}));check(q('#floating-flip').hidden,'選択解除で非表示');
+});
+await test('完成タイル直下のボタンと左チェックが双方向に連動する',()=>{
+ click('#settings-reset');click('#all-reset');check(q('#preview').nextElementSibling===q('#piece-face-buttons'),'図の直下');check(d.querySelectorAll('[data-piece-face]').length===4,'4ボタン');
+ const name=q('[data-piece-face="0"]').textContent;check(name.includes('上（A）')&&name.includes('表'),'名前と初期状態');
+ click('[data-piece-face="0"]');check(q('#piece-back-0').checked,'左に反映');check(q('[data-piece-face="0"]').getAttribute('aria-pressed')==='true','裏表示');check(q('#preview [data-piece-background="0"]').getAttribute('fill')==='#DCE2E6','タイルに反映');check(q('[data-tile="0"] [data-piece-background="0"]').getAttribute('fill')==='#DCE2E6','敷き詰めに反映');
+ tick('#piece-back-0');check(q('[data-piece-face="0"]').getAttribute('aria-pressed')==='false','チェックから表表示');
+ click('[data-tile="5"]');const before=q('[data-tile="5"]').getAttribute('transform');click('[data-piece-face="1"]');check(q('[data-tile="5"]').getAttribute('transform')===before,'タイル全体の向きは保持');check(!q('#floating-flip').hidden,'03の近接ボタン維持');
+});
+await test('4・6・8個の表裏ボタンは各ピースを独立操作し、SVGには含めない',()=>{
+ for(const mode of ['4','6','8']){
+  select('#piece-mode',mode);check(d.querySelectorAll('[data-piece-face]').length===Number(mode),'ボタン数');
+  const before=[...q('#backs').querySelectorAll('input')].map(i=>i.checked);const index=Number(mode)-1;click(`[data-piece-face="${index}"]`);
+  [...q('#backs').querySelectorAll('input')].forEach((input,i)=>check(input.checked===(i===index?!before[i]:before[i]),'独立操作'));
+  check(!q('#preview svg [data-piece-face]')&&!q('#board svg [data-piece-face]'),'PNG用SVG外');
+ }
 });
 await test('マーク変更・操作・設定リセット・全体リセット・PNGで追加送信しない',()=>{select('#pair-mark-0','circle');click('#all-reset');click('#settings-reset');check(w.counterRequests.length===1,'操作で追加記録');});
 await test('再読み込み相当の新documentでは新たに1回だけ記録',async()=>{await load();w=iframe.contentWindow;d=w.document;check(w.counterRequests.length===1,'新documentのアクセス');check(d.querySelectorAll('[data-hand]').length===17,'再読込後の描画');});

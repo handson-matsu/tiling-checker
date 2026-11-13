@@ -1,3 +1,4 @@
+import {placeFlipButton} from './floating-flip.js';
 import {appendMismatchLayer} from './mismatch.js';
 import {HAND_PARTS,handAppearance,tileTransform} from './hand.js';
 import {recordAccessOnce} from './access-counter.js';
@@ -46,10 +47,38 @@ if(!interactive&&selectedPiece){
 }
 return outer;}
 function svg(box){return el('svg',{xmlns:NS,viewBox:box,'aria-label':'白い正方形と色付きの半分のマーク'});}
-function render(){const count=pieces(state).length;$('#piece-mode').value=state.mode;$('#pair-selection').textContent=pairMessage||'同じ辺の半分ピースが1組のペアです。完全な形は隣接タイルとの境界で確認します。';$('.badge').textContent=`正方形 · ${count}ピース`;$('#piece-description').textContent=`点線に沿って切り分ける${count}枚のパーツ`;const p=svg('-115 -115 230 230');drawTile(p,{rotation:0,flip:false});$('#preview').replaceChildren(p);const b=svg('-115 -115 830 830');tiles.forEach((t,i)=>drawTile(b,t,{interactive:true,index:i}));const results=checkTiling(state,tiles);const t=selected===null?null:tiles[selected];if(t)b.append(el('rect',{x:t.x-94,y:t.y-94,width:188,height:188,rx:6,fill:'none',stroke:'#233f49','stroke-width':3,'stroke-dasharray':'12 7','pointer-events':'none','data-selection':'true'}));appendMismatchLayer(b,results,showMismatches,el);$('#show-mismatches').checked=showMismatches;$('#board').replaceChildren(b);const good=results.filter(r=>r.match).length;$('#status').textContent=`隣接する${results.length}辺中 ${good}辺が一致 ／ ${results.length-good}辺が不一致`;$('#flip').disabled=!t;$('#one-reset').disabled=!t;$('#selection').textContent=t?`選択：${Math.floor(selected/4)+1}行 ${selected%4+1}列 · ${t.rotation*90}° · ${t.flip?'裏返し':'通常'}`:'タイルを選択してください。選択中のタイルを再度押すと90°回転します。';}
+function render(){const count=pieces(state).length;$('#piece-mode').value=state.mode;$('#pair-selection').textContent=pairMessage||'同じ辺の半分ピースが1組のペアです。完全な形は隣接タイルとの境界で確認します。';$('.badge').textContent=`正方形 · ${count}ピース`;$('#piece-description').textContent=`点線に沿って切り分ける${count}枚のパーツ`;const p=svg('-115 -115 230 230');drawTile(p,{rotation:0,flip:false});$('#preview').replaceChildren(p);renderPieceFaceButtons();const b=svg('-115 -115 830 830');tiles.forEach((t,i)=>drawTile(b,t,{interactive:true,index:i}));const results=checkTiling(state,tiles);const t=selected===null?null:tiles[selected];if(t)b.append(el('rect',{x:t.x-94,y:t.y-94,width:188,height:188,rx:6,fill:'none',stroke:'#233f49','stroke-width':3,'stroke-dasharray':'12 7','pointer-events':'none','data-selection':'true'}));appendMismatchLayer(b,results,showMismatches,el);$('#show-mismatches').checked=showMismatches;$('#board').replaceChildren(b);const good=results.filter(r=>r.match).length;$('#status').textContent=`隣接する${results.length}辺中 ${good}辺が一致 ／ ${results.length-good}辺が不一致`;$('#flip').disabled=!t;$('#one-reset').disabled=!t;$('#selection').textContent=t?`選択：${Math.floor(selected/4)+1}行 ${selected%4+1}列 · ${t.rotation*90}° · ${t.flip?'裏返し':'通常'}`:'タイルを選択してください。選択中のタイルを再度押すと90°回転します。';updateFloatingFlip();}
 function pieceName(piece){
  const locations=[['左半分','右半分'],['上半分','下半分'],['右半分','左半分'],['下半分','上半分']];
  return names[piece.edge]+(piece.end-piece.start<1?`・${locations[piece.edge][piece.segment]}`:'');
+}
+function setPieceBack(index,back){
+ state.backs[index]=back;
+ const checkbox=$(`#piece-back-${index}`);
+ if(checkbox)checkbox.checked=back;
+ render();
+}
+function renderPieceFaceButtons(){
+ const host=$('#piece-face-buttons'),active=pieces(state);
+ const structure=active.map(p=>p.id).join('|');
+ if(host.dataset.structure!==structure){
+  host.replaceChildren();
+  active.forEach(piece=>{
+   const button=document.createElement('button');button.type='button';button.dataset.pieceFace=piece.index;
+   button.append(document.createElement('span'),document.createElement('strong'));
+   button.onclick=()=>setPieceBack(piece.index,!state.backs[piece.index]);
+   host.append(button);
+  });
+  host.dataset.structure=structure;
+ }
+ active.forEach(piece=>{
+  const button=host.children[piece.index],back=Boolean(state.backs[piece.index]);
+  const name=`${pieceName(piece)}（${pairLabel(piece.pair)}）`;
+  button.firstElementChild.textContent=name;
+  button.lastElementChild.textContent=back?'裏':'表';
+  button.setAttribute('aria-pressed',String(back));
+  button.setAttribute('aria-label',`${name}：${back?'裏':'表'}。押すと${back?'表':'裏'}にする`);
+ });
 }
 function choosePiece(id){
  if(selectedPiece===id){selectedPiece=null;pairMessage='選択を解除しました。';}
@@ -76,7 +105,7 @@ function controls(){
  $('#backs').replaceChildren();
  active.forEach(piece=>{
   const label=document.createElement('label');label.className='check';const input=document.createElement('input');input.type='checkbox';input.checked=state.backs[piece.index];input.id=`piece-back-${piece.index}`;
-  input.onchange=()=>{state.backs[piece.index]=input.checked;render();};label.append(input,`${pieceName(piece)}（${pairLabel(piece.pair)}）を裏返す`);$('#backs').append(label);
+  input.onchange=()=>setPieceBack(piece.index,input.checked);label.append(input,`${pieceName(piece)}（${pairLabel(piece.pair)}）を裏返す`);$('#backs').append(label);
  });
  $('#back-color').checked=state.backColor;$('#show-hand').checked=state.showHand;
 }
@@ -85,7 +114,41 @@ $('#show-mismatches').onchange=e=>{showMismatches=e.target.checked;render();};
 $('#show-hand').onchange=e=>{state.showHand=e.target.checked;render();};
 $('#piece-mode').onchange=e=>reconfigure({mode:Number(e.target.value)});
 $('#origin').onchange=e=>reconfigure({origin:Number(e.target.value)});
-$('#layout').onchange=e=>reconfigure({layout:e.target.value});$('#back-color').onchange=e=>{state.backColor=e.target.checked;render();};$('#settings-reset').onclick=()=>{state=defaults();selectedPiece=null;pairMessage='';controls();render();};$('#flip').onclick=()=>{if(selected===null)return;tiles[selected].flip=!tiles[selected].flip;render();};$('#one-reset').onclick=()=>{if(selected===null)return;Object.assign(tiles[selected],{rotation:0,flip:false});render();};$('#all-reset').onclick=()=>{tiles=initialTiles();selected=null;render();};
+$('#layout').onchange=e=>reconfigure({layout:e.target.value});$('#back-color').onchange=e=>{state.backColor=e.target.checked;render();};$('#settings-reset').onclick=()=>{state=defaults();selectedPiece=null;pairMessage='';controls();render();};$('#flip').onclick=flipSelectedTile;$('#one-reset').onclick=()=>{if(selected===null)return;Object.assign(tiles[selected],{rotation:0,flip:false});render();};$('#all-reset').onclick=()=>{tiles=initialTiles();selected=null;render();};
+function flipSelectedTile(){
+ if(selected===null)return;
+ tiles[selected].flip=!tiles[selected].flip;
+ render();
+}
+$('#floating-flip').addEventListener('click',event=>{
+ event.stopPropagation();
+ flipSelectedTile();
+});
+function updateFloatingFlip(){
+ const button=$('#floating-flip');
+ const tile=selected===null?null:$(`#board [data-tile="${selected}"]`);
+ if(!tile){button.hidden=true;return;}
+ const rect=tile.getBoundingClientRect(),shell=$('#board-shell').getBoundingClientRect();
+ const viewport=window.visualViewport;
+ const screen={left:viewport?.offsetLeft||0,top:viewport?.offsetTop||0,right:(viewport?.offsetLeft||0)+(viewport?.width||innerWidth),bottom:(viewport?.offsetTop||0)+(viewport?.height||innerHeight)};
+ if(rect.bottom<=screen.top||rect.top>=screen.bottom||rect.right<=screen.left||rect.left>=screen.right){button.hidden=true;return;}
+ button.hidden=false;
+ const bounds={left:Math.max(shell.left,screen.left+8),right:Math.min(shell.right,screen.right-8),top:Math.max(shell.top,screen.top+8),bottom:Math.min(shell.bottom,screen.bottom-8)};
+ const pos=placeFlipButton(rect,bounds,{width:button.offsetWidth,height:button.offsetHeight});
+ button.style.left=`${pos.left-shell.left}px`;
+ button.style.top=`${pos.top-shell.top}px`;
+ button.dataset.side=pos.side;
+}
+let floatingFrame=null;
+function scheduleFloatingFlip(){
+ if(floatingFrame!==null)return;
+ floatingFrame=requestAnimationFrame(()=>{floatingFrame=null;updateFloatingFlip();});
+}
+window.addEventListener('resize',scheduleFloatingFlip);
+window.addEventListener('scroll',scheduleFloatingFlip,{capture:true,passive:true});
+window.visualViewport?.addEventListener('resize',scheduleFloatingFlip);
+window.visualViewport?.addEventListener('scroll',scheduleFloatingFlip);
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(scheduleFloatingFlip).observe($('#board-shell'));
 // Keep action/settings controls usable without clearing the selected tile.
 document.addEventListener('click',event=>{
   if(event.target.closest('#board [data-tile],#preview,button,input,select,label,aside'))return;

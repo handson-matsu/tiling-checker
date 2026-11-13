@@ -3,3 +3,12 @@
 button:disabled{opacity:.45;cursor:default;filter:none}
 .preview [data-piece-select]{cursor:pointer;outline:none}
 .preview [data-piece-select]:focus-visible{stroke:#237e73;stroke-width:3}
+
+.board-shell{position:relative}
+.floating-flip{position:absolute;z-index:2;min-height:44px;min-width:104px;padding:10px 12px;white-space:nowrap;font-size:14px;border:1px solid #fff;box-shadow:0 2px 8px #193d4533;touch-action:manipulation}
+.floating-flip[hidden]{display:none}
+
+.piece-face-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.piece-face-buttons button{min-height:48px;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 10px;background:#fff;color:#345a58;border:1px solid #c8d6d4;font-size:13px;text-align:left}
+.piece-face-buttons button[aria-pressed="true"]{background:#DCE2E6;border-color:#667e89;color:#263c46}
+.piece-face-buttons strong{flex:none;font-size:12px;border:1px solid currentColor;border-radius:5px;padding:2px 5px}
